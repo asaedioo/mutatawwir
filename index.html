@@ -55,7 +55,14 @@ function render(){ $('totalSessions').textContent=workouts.length;$('totalExerci
 
 async function makeProgressShare(){
  const W=1080,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
- const bg=x.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#14263a');bg.addColorStop(.55,'#071426');bg.addColorStop(1,'#04101e');x.fillStyle=bg;x.fillRect(0,0,W,H);
+ // Pick one of three cinematic workout scenes for variety. Images are bundled locally so this also works offline.
+ const sceneNo=1+Math.floor(Math.random()*3);const scene=new Image();scene.src=`scene-${sceneNo}.jpg`;
+ try{await new Promise((resolve,reject)=>{scene.onload=resolve;scene.onerror=reject});
+   const sw=scene.naturalWidth,sh=scene.naturalHeight,scale=Math.max(W/sw,H/sh),dw=sw*scale,dh=sh*scale;
+   x.drawImage(scene,(W-dw)/2,(H-dh)/2,dw,dh);
+ }catch(e){x.fillStyle='#071426';x.fillRect(0,0,W,H)}
+ // Deep navy overlay keeps the live stats readable over the selected athlete photo.
+ const shade=x.createLinearGradient(0,0,W,H);shade.addColorStop(0,'rgba(3,13,25,.76)');shade.addColorStop(.48,'rgba(3,13,25,.88)');shade.addColorStop(1,'rgba(3,13,25,.96)');x.fillStyle=shade;x.fillRect(0,0,W,H);
  // decorative strokes
  x.globalAlpha=.22;x.strokeStyle='#16d79b';x.lineWidth=18;x.beginPath();x.moveTo(-40,180);x.lineTo(260,-20);x.moveTo(820,1380);x.lineTo(1120,1110);x.stroke();x.globalAlpha=1;
  function roundRect(px,py,pw,ph,r,fill,stroke){x.beginPath();x.roundRect(px,py,pw,ph,r);x.fillStyle=fill;x.fill();if(stroke){x.strokeStyle=stroke;x.lineWidth=3;x.stroke()}}
