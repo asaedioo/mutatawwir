@@ -54,33 +54,45 @@ function editWorkout(id){const w=workouts.find(x=>x.id===id);if(!w)return;editin
 function render(){ $('totalSessions').textContent=workouts.length;$('totalExercises').textContent=new Set(workouts.map(w=>w.name.toLocaleLowerCase())).size;$('totalSets').textContent=workouts.reduce((n,w)=>n+w.sets.length,0);const names=[...new Set(workouts.map(w=>w.name))].sort((a,b)=>a.localeCompare(b,'ar'));const selected=$('exerciseSelect').value;$('exerciseSelect').innerHTML='<option value="">اختار تمرين...</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');if(names.includes(selected))$('exerciseSelect').value=selected;renderOverall();renderTrends();renderHistory()}
 
 async function makeProgressShare(){
- const W=1080,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
- // Pick one of three cinematic workout scenes for variety. Images are bundled locally so this also works offline.
+ const W=1080,H=1920,LAYOUT_H=1350,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
  const sceneNo=1+Math.floor(Math.random()*3);const scene=new Image();scene.src=`scene-${sceneNo}.jpg`;
  try{await new Promise((resolve,reject)=>{scene.onload=resolve;scene.onerror=reject});
    const sw=scene.naturalWidth,sh=scene.naturalHeight,scale=Math.max(W/sw,H/sh),dw=sw*scale,dh=sh*scale;
    x.drawImage(scene,(W-dw)/2,(H-dh)/2,dw,dh);
- }catch(e){x.fillStyle='#071426';x.fillRect(0,0,W,H)}
- // Deep navy overlay keeps the live stats readable over the selected athlete photo.
- const shade=x.createLinearGradient(0,0,W,H);shade.addColorStop(0,'rgba(3,13,25,.76)');shade.addColorStop(.48,'rgba(3,13,25,.88)');shade.addColorStop(1,'rgba(3,13,25,.96)');x.fillStyle=shade;x.fillRect(0,0,W,H);
- // decorative strokes
- x.globalAlpha=.22;x.strokeStyle='#16d79b';x.lineWidth=18;x.beginPath();x.moveTo(-40,180);x.lineTo(260,-20);x.moveTo(820,1380);x.lineTo(1120,1110);x.stroke();x.globalAlpha=1;
- function roundRect(px,py,pw,ph,r,fill,stroke){x.beginPath();x.roundRect(px,py,pw,ph,r);x.fillStyle=fill;x.fill();if(stroke){x.strokeStyle=stroke;x.lineWidth=3;x.stroke()}}
+ }catch(e){x.fillStyle='#06111e';x.fillRect(0,0,W,H)}
+ // Keep the athlete clearly visible on the right; darken the left side for readable stats.
+ const shade=x.createLinearGradient(0,0,W,0);shade.addColorStop(0,'rgba(2,10,19,.97)');shade.addColorStop(.48,'rgba(2,10,19,.86)');shade.addColorStop(.72,'rgba(2,10,19,.42)');shade.addColorStop(1,'rgba(2,10,19,.16)');x.fillStyle=shade;x.fillRect(0,0,W,H);
+ const bottom=x.createLinearGradient(0,850,0,H);bottom.addColorStop(0,'rgba(2,10,19,0)');bottom.addColorStop(1,'rgba(2,10,19,.9)');x.fillStyle=bottom;x.fillRect(0,850,W,H);
+ x.save();x.scale(1,H/LAYOUT_H);\n function roundRect(px,py,pw,ph,r,fill,stroke){x.beginPath();x.roundRect(px,py,pw,ph,r);x.fillStyle=fill;x.fill();if(stroke){x.strokeStyle=stroke;x.lineWidth=3;x.stroke()}}
  function text(t,px,py,size,color,align='right',weight=500){x.font=`${weight} ${size}px system-ui, Arial, sans-serif`;x.fillStyle=color;x.textAlign=align;x.direction='rtl';x.fillText(t,px,py)}
  const names=[...new Set(workouts.map(w=>w.name.toLocaleLowerCase()))];const changes=[];let up=0,down=0,steady=0;
  names.forEach(name=>{const arr=orderedForName(name);if(arr.length<2)return;const prev=arr[arr.length-2],latest=arr[arr.length-1],base=bestEstimate(prev),now=bestEstimate(latest);if(base<=0)return;const pct=(now-base)/base*100;changes.push(pct);if(pct>0.5)up++;else if(pct<-.5)down++;else steady++});
- const avg=changes.length?changes.reduce((a,b)=>a+b,0)/changes.length:null;const series=overallTrendSeries();const last=series.length?series[series.length-1].value:100;const curvePct=last-100;const pctText=avg===null?'بانتظار المقارنة':`${avg>0?'+':''}${avg.toFixed(1)}%`;
- text('مُتطوّر',W-70,100,58,'#f5f8ff','right',800);text('ملخص التقدم الرياضي',W-72,155,28,'#a9bad2','right',500);
- roundRect(55,205,970,380,32,'rgba(13,29,48,.95)','#21415e');text('المؤشر الكلي لكل التمارين',W-95,270,30,'#b6c7dc');text(avg===null?'—':`${avg>0?'↑ ':avg<0?'↓ ':'↔ '}${pctText}`,W-95,370,82,avg===null?'#9eb1c9':avg>0.5?'#43d6a0':avg<-.5?'#ff7f86':'#7db7ff','right',800);text(avg===null?'سجّل التمرين مرة ثانية حتى نقارن الأداء':'مقارنة آخر تسجيل بالتسجيل السابق لكل تمرين',W-95,425,24,'#43d6a0');
- // chart card
- roundRect(85,465,910,300,24,'#081626','#1e3852');text('منحنى التطور الكلي',W-120,515,25,'#c1cfe0');text(`${curvePct>=0?'+':''}${curvePct.toFixed(1)}% من خط البداية`,160,515,22,curvePct>=0?'#43d6a0':'#ff7f86','left',700);
- const vals=series.length?series.map(a=>a.value):[100];let min=Math.min(100,...vals),max=Math.max(100,...vals);if(max-min<2){min-=1;max+=1}const pad=(max-min)*.18;min-=pad;max+=pad;const L=130,R=950,T=555,B=700;const xx=i=>L+(vals.length===1?(R-L)/2:i*(R-L)/(vals.length-1));const yy=v=>T+(max-v)*(B-T)/(max-min);
- x.strokeStyle='#50657e';x.lineWidth=2;x.setLineDash([9,9]);x.beginPath();x.moveTo(L,yy(100));x.lineTo(R,yy(100));x.stroke();x.setLineDash([]);x.strokeStyle=curvePct>=0?'#43d6a0':'#ff7f86';x.lineWidth=8;x.lineJoin='round';x.lineCap='round';x.beginPath();vals.forEach((v,i)=>i?x.lineTo(xx(i),yy(v)):x.moveTo(xx(i),yy(v)));x.stroke();vals.forEach((v,i)=>{x.beginPath();x.arc(xx(i),yy(v),i===vals.length-1?10:6,0,Math.PI*2);x.fillStyle=i===vals.length-1?(curvePct>=0?'#43d6a0':'#ff7f86'):'#9db2cc';x.fill()});
- text(`آخر تسجيل: ${series.length?fmtDate(series[series.length-1].date):'—'}`,W-120,740,20,'#a9bad2');text('خط البداية: 100',140,740,20,'#a9bad2','left');
- roundRect(55,800,970,330,30,'rgba(13,29,48,.95)','#21415e');text('إنجازاتك',W-95,865,32,'#f4f7fb','right',700);
- const countWorkouts=workouts.length, countExercises=names.length, countSets=workouts.reduce((n,w)=>n+w.sets.length,0);text(`جلسات مسجلة: ${countWorkouts}`,W-95,930,27,'#d2deec');text(`تمارين مختلفة: ${countExercises}`,W-95,985,27,'#d2deec');text(`مجموعات مسجلة: ${countSets}`,W-95,1040,27,'#d2deec');text(`صاعد: ${up}   •   ثابت: ${steady}   •   نازل: ${down}`,W-95,1090,25,'#43d6a0');
- text('خطوة صغيرة اليوم.. فرق كبير باچر 💪',W/2,1205,32,'#f5f8ff','center',700);text('شارك تقدمك مع أصدقائك',W/2,1260,24,'#9fb2ca','center');
- return await new Promise(resolve=>c.toBlob(resolve,'image/png'));
+ const avg=changes.length?changes.reduce((a,b)=>a+b,0)/changes.length:null;const series=overallTrendSeries();const last=series.length?series[series.length-1].value:100;const curvePct=last-100;
+ const green='#37e5a3', pale='#f5f8ff', muted='#b8c9dc', panel='rgba(4,17,29,.88)', edge='rgba(70,170,220,.6)';
+ // Header and strong progress block, closer to the requested cinematic poster.
+ text('مُتطوّر',W-64,88,58,pale,'right',800);text('ملخص التقدم الرياضي',W-68,132,25,muted);
+ roundRect(48,180,590,240,28,panel,edge);text('نسبة التطور الكلية',W-480,230,27,muted);
+ text(avg===null?'سجّل جلسة أخرى':`${avg>0?'↑ ':avg<0?'↓ ':'↔ '}${avg>0?'+':''}${avg.toFixed(1)}%`,W-480,325,76,avg===null?muted:avg>=0?green:'#ff808b','right',800);
+ text(avg===null?'راح يظهر تطورك بعد التسجيل القادم':avg>0.5?'تطورك مستمر، استمر!':avg<-.5?'راجع أداءك وتعافيك':'أداؤك قريب من السابق',W-480,370,23,green);
+ // Chart card
+ roundRect(48,445,590,330,26,panel,edge);text('منحنى التطور الكلي',W-480,495,26,pale);
+ text(`${curvePct>=0?'+':''}${curvePct.toFixed(1)}% من خط البداية`,92,495,20,green,'left',700);
+ const vals=series.length?series.map(a=>a.value):[100];let min=Math.min(100,...vals),max=Math.max(100,...vals);if(max-min<2){min-=1;max+=1}const pad=(max-min)*.18;min-=pad;max+=pad;
+ const L=95,R=590,T=545,B=700;const xx=i=>L+(vals.length===1?(R-L)/2:i*(R-L)/(vals.length-1));const yy=v=>T+(max-v)*(B-T)/(max-min);
+ x.strokeStyle='#526a81';x.lineWidth=2;x.setLineDash([8,8]);x.beginPath();x.moveTo(L,yy(100));x.lineTo(R,yy(100));x.stroke();x.setLineDash([]);
+ x.strokeStyle=curvePct>=0?green:'#ff808b';x.lineWidth=7;x.lineJoin='round';x.lineCap='round';x.beginPath();vals.forEach((v,i)=>i?x.lineTo(xx(i),yy(v)):x.moveTo(xx(i),yy(v)));x.stroke();
+ vals.forEach((v,i)=>{x.beginPath();x.arc(xx(i),yy(v),i===vals.length-1?9:5,0,Math.PI*2);x.fillStyle=i===vals.length-1?(curvePct>=0?green:'#ff808b'):'#b7c9dc';x.fill()});
+ text(`آخر تسجيل: ${series.length?fmtDate(series[series.length-1].date):'—'}`,W-480,740,18,muted);text('خط البداية: 100',95,740,18,muted,'left');
+ // Compact achievement strip along the bottom.
+ const countSessions=workouts.length,countExercises=names.length,countSets=workouts.reduce((n,w)=>n+w.sets.length,0),volume=workouts.reduce((n,w)=>n+totalVolume(w),0);
+ roundRect(48,815,984,225,26,'rgba(4,17,29,.91)',edge);text('إنجازاتك',W-78,865,30,pale);
+ const metrics=[{label:'جلسات مسجلة',value:String(countSessions)},{label:'تمارين مختلفة',value:String(countExercises)},{label:'مجموعات مسجلة',value:String(countSets)},{label:'الحجم الكلي',value:`${Math.round(volume).toLocaleString()} كغم`}];
+ const colW=230;metrics.forEach((m,i)=>{const cx=70+i*245;text(m.label,cx+colW-12,915,19,muted);text(m.value,cx+colW-12,972,35,green,'right',800);if(i>0){x.strokeStyle='rgba(70,170,220,.35)';x.lineWidth=2;x.beginPath();x.moveTo(cx-12,885);x.lineTo(cx-12,1005);x.stroke()}});
+ text(`↑ صاعد: ${up}   •   ثابت: ${steady}   •   نازل: ${down}`,W/2,1090,25,green,'center',700);
+ text('BETTER THAN YESTERDAY',W/2,1180,39,green,'center',800);
+ text('خطوة صغيرة اليوم.. فرق كبير باچر 💪',W/2,1230,26,pale,'center',700);
+ text(`مُتطوّر  •  ${fmtDate(new Date().toISOString().slice(0,10))}`,W/2,1290,20,muted,'center');
+ x.restore();\n return await new Promise(resolve=>c.toBlob(resolve,'image/png'));
 }
 $('shareProgressBtn').addEventListener('click',async()=>{if(!workouts.length){toast('سجّل تمرين واحد على الأقل قبل المشاركة');return}const btn=$('shareProgressBtn');btn.disabled=true;const old=btn.textContent;btn.textContent='جارٍ تجهيز الصورة…';try{const blob=await makeProgressShare();if(!blob)throw new Error('image');const file=new File([blob],`mutatawwir-progress-${new Date().toISOString().slice(0,10)}.png`,{type:'image/png'});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'تقدمي مع مُتطوّر',text:'هذا ملخص تقدمي في التمارين 💪'})}else{const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);toast('جهزنا صورة التقدم وحفظناها؛ شاركها من المعرض')} }catch(err){if(err.name!=='AbortError')toast('ما قدرنا نفتح المشاركة؛ حاول مرة ثانية')}finally{btn.disabled=false;btn.textContent=old}});
 
